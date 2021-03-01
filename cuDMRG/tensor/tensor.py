@@ -33,8 +33,9 @@ class Tensor:
     def norm(self) -> float:
         return xp.linalg.norm(self._data)
 
-    def normalize(self) -> None:
+    def normalize(self) -> "Tensor":
         self._data /= self.norm()
+        return self
 
     def setZero(self) -> "Tensor":
         self._data = xp.zeros([idx.size for idx in self._indices])
@@ -118,7 +119,7 @@ class Tensor:
                  connection: Optional[Index] = None,
                  mergeV: bool = True,
                  cutoff: float = 1e-9,
-                 maxdim: int = 4096) -> Tuple["Tensor", "Tensor"]:
+                 maxdim: int = 4096) -> Tuple["Tensor", "Tensor", int]:
         lhs_size = reduce(lambda x, y: x * y,
                           [self._indices[i].size for i in lhs])
         rhs_size = reduce(lambda x, y: x * y,
@@ -132,15 +133,16 @@ class Tensor:
         s_norm = xp.linalg.norm(s)
         s_cutoff = (1 - cutoff) * s_norm * s_norm
         s_squared_cumsum = xp.cumsum(xp.power(s, 2))
-        keepdim = 0
+
+        dim = 0
         for i in range(s.size):
-            keepdim += 1
-            if s_squared_cumsum[i] >= s_cutoff or i > maxdim:
+            dim += 1
+            if s_squared_cumsum[i] >= s_cutoff or (dim + 1) > maxdim:
                 break
 
-        u = u[:, :keepdim]
-        s = s[:keepdim] * xp.sqrt(s_norm / s_squared_cumsum[keepdim - 1])
-        v = v[:keepdim, :]
+        u = u[:, :dim]
+        s = s[:dim] * xp.sqrt(s_norm / s_squared_cumsum[dim - 1])
+        v = v[:dim, :]
 
         if mergeV:
             v = xp.diag(s) @ v
@@ -148,19 +150,17 @@ class Tensor:
             u = u @ xp.diag(s)
 
         if connection is None:
-            a = Index(keepdim)
-            b = deepcopy(a).raiseLevel()
+            a = Index(dim)
         else:
-            a = deepcopy(connection).setSize(keepdim).resetLevel()
-            a = deepcopy(a).raiseLevel()
+            a = deepcopy(connection).setSize(dim).resetLevel()
 
         lhs_indices = self._indices[:len(lhs)] + [a]
-        rhs_indices = [b] + self._indices[len(lhs):]
+        rhs_indices = [a] + self._indices[len(lhs):]
         lhs_tensor = Tensor(lhs_indices,
                             u.reshape([idx.size for idx in lhs_indices]))
         rhs_tensor = Tensor(rhs_indices,
                             v.reshape([idx.size for idx in rhs_indices]))
-        return lhs_tensor, rhs_tensor
+        return lhs_tensor, rhs_tensor, dim
 
     @property
     def rank(self):
@@ -296,16 +296,3 @@ class Tensor:
         indices_str = ", ".join([str(idx) for idx in self._indices])
         data_str = str(self._data)
         return indices_str + "\n" + data_str
-
-
-# def decompose(t: Tensor,
-#               axes=Tuple[List[int], List[int]]) -> Tuple[Tensor, Tensor]:
-#     t.transpose(axes=axes)
-
-# def svdBond(lhs: Tensor, rhs: Tensor) -> Tensor:
-#     lhs_contracted, rhs_contracted = getEinsumRule(lhs._indices, rhs._indices)
-#     lhs_free = [i for i in range(lhs.rank) if i not in lhs_contracted]
-#     rhs_free = [i for i in range(rhs.rank) if i not in rhs_contracted]
-
-#     contracted = lhs * rhs
-#     return
