@@ -29,7 +29,7 @@ class Index:
         return self._size
 
     @property
-    def type(self) -> IndexType:
+    def indexType(self) -> IndexType:
         return self._index_type
 
     @property

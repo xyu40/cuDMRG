@@ -6,7 +6,14 @@ if __name__ == "__main__":
     B = Tensor(indices[1:]).setRandom()
 
     print(A)
-    print(B)
+    print(A * 2)
+
+    print(B * 0.5)
+    print(B / 0.5)
+
     print(A * B)
 
     print(A._data @ B._data)
+
+    print(A + 1)
+    print(A - B)
