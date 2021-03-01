@@ -1,19 +1,17 @@
+from copy import deepcopy
 from cuDMRG import Index, Tensor
 
 if __name__ == "__main__":
-    indices = [Index(3), Index(4), Index(5)]
-    A = Tensor(indices[:-1]).setRandom()
-    B = Tensor(indices[1:]).setRandom()
+    a = Index(6)
+    b = Index(2)
+    c = Index(8)
 
-    print(A)
-    print(A * 2)
+    A = Tensor([a, b]).setRandom()
+    B = Tensor([b, c]).setRandom()
+    C = A * B
 
-    print(B * 0.5)
-    print(B / 0.5)
+    print(C)
 
-    print(A * B)
-
-    print(A._data @ B._data)
-
-    print(A + 1)
-    print(A - B)
+    lhs, rhs = C.deompose([0], [1])
+    print(lhs._data.T @ lhs._data)
+    print(rhs._data @ rhs._data.T)

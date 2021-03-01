@@ -55,6 +55,20 @@ class Index:
             self._level = level
         return self
 
+    def resetLevel(self, index_type=IndexType.ANYTYPE) -> "Index":
+        if index_type is IndexType.ANYTYPE or self._index_type == index_type:
+            self._level = 0
+        return self
+
+    def mapLevel(self,
+                 level_from: int,
+                 level_to: int,
+                 index_type=IndexType.ANYTYPE) -> "Index":
+        if index_type is IndexType.ANYTYPE or self._index_type == index_type:
+            if self._level == level_from:
+                self._level = level_to
+        return self
+
     def almostIndentical(self, rhs: "Index") -> bool:
         return self._id == rhs._id and self._level != rhs._level
 

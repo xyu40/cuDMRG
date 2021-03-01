@@ -4,8 +4,9 @@ except ImportError:
     import numpy as xp
 from numbers import Number
 from copy import deepcopy
-from typing import List, Optional, Any
-from .index import Index, getEinsumRule
+from functools import reduce
+from typing import List, Tuple, Optional, Any
+from .index import Index, IndexType, getEinsumRule
 from ..utils import get_logger
 
 logger = get_logger(__name__)
@@ -29,6 +30,12 @@ class Tensor:
         else:
             self._data = deepcopy(data)
 
+    def norm(self) -> float:
+        return xp.linalg.norm(self._data)
+
+    def normalize(self) -> None:
+        self._data /= self.norm()
+
     def setZero(self) -> "Tensor":
         self._data = xp.zeros([idx.size for idx in self._indices])
         return self
@@ -40,6 +47,124 @@ class Tensor:
     def setRandom(self) -> "Tensor":
         self._data = xp.random.random([idx.size for idx in self._indices])
         return self
+
+    def raiseIndexLevel(self,
+                        indexType: IndexType = IndexType.ANYTYPE) -> "Tensor":
+        for idx in self._indices:
+            idx.raiseLevel(indexType)
+        return self
+
+    def lowerIndexLevel(self,
+                        indexType: IndexType = IndexType.ANYTYPE) -> "Tensor":
+        for idx in self._indices:
+            idx.raiseLevel(indexType)
+        return self
+
+    def resetIndexLevel(self,
+                        indexType: IndexType = IndexType.ANYTYPE) -> "Tensor":
+        for idx in self._indices:
+            idx.resetLevel(indexType)
+        return self
+
+    def mapIndexLevel(self,
+                      level_from: int,
+                      level_to: int,
+                      indexType: IndexType = IndexType.ANYTYPE) -> "Tensor":
+        for idx in self._indices:
+            idx.mapLevel(level_from, level_to, indexType)
+        return self
+
+    def transpose(self, axes) -> "Tensor":
+        if len(set(axes)) != len(axes):
+            msg = "Invalid transpose input"
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        transpose_needed = False
+        for i, j in enumerate(axes):
+            if i != j:
+                transpose_needed = True
+                break
+
+        if transpose_needed:
+            self._indices = [self._indices[i] for i in axes]
+            self._data = xp.transpose(self._data, axes=axes)
+        return self
+
+    def diagonal(self) -> "Tensor":
+        if self._rank % 2 != 0:
+            msg = "Cannot get diagonal from Tensor with odd rank"
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        lhs_indices = []
+        rhs_indices = []
+        for i in range(self._rank):
+            for j in range(i + 1, self._rank):
+                if self._indices[i].almostIndentical(self._indices[j]):
+                    lhs_indices.append(i)
+                    rhs_indices.append(j)
+        self.transpose(lhs_indices + rhs_indices)
+
+        res_size = [self._indices[i].size for i in lhs_indices]
+        diag_size = reduce(lambda x, y: x * y, res_size)
+        res_indices = [self._indices[i].resetLevel() for i in lhs_indices]
+        res_data = xp.diag(self._data.reshape(diag_size, -1)).reshape(res_size)
+        return Tensor(res_indices, res_data)
+
+    def deompose(self,
+                 lhs: List[int],
+                 rhs: List[int],
+                 connection: Optional[Index] = None,
+                 mergeV: bool = True,
+                 cutoff: float = 1e-9,
+                 maxdim: int = 4096) -> Tuple["Tensor", "Tensor"]:
+        lhs_size = reduce(lambda x, y: x * y,
+                          [self._indices[i].size for i in lhs])
+        rhs_size = reduce(lambda x, y: x * y,
+                          [self._indices[i].size for i in rhs])
+        self.transpose(lhs + rhs)
+        self._data.reshape([lhs_size, rhs_size])
+        u, s, v = xp.linalg.svd(self._data,
+                                full_matrices=False,
+                                compute_uv=True)
+
+        s_norm = xp.linalg.norm(s)
+        s_cutoff = (1 - cutoff) * s_norm * s_norm
+        s_squared_cumsum = xp.cumsum(xp.power(s, 2))
+        keepdim = 0
+        for i in range(s.size):
+            keepdim += 1
+            if s_squared_cumsum[i] >= s_cutoff or i > maxdim:
+                break
+
+        u = u[:, :keepdim]
+        s = s[:keepdim] * xp.sqrt(s_norm / s_squared_cumsum[keepdim - 1])
+        v = v[:keepdim, :]
+
+        if mergeV:
+            v = xp.diag(s) @ v
+        else:
+            u = u @ xp.diag(s)
+
+        if connection is None:
+            a = Index(keepdim)
+            b = deepcopy(a).raiseLevel()
+        else:
+            a = deepcopy(connection).setSize(keepdim).resetLevel()
+            a = deepcopy(a).raiseLevel()
+
+        lhs_indices = self._indices[:len(lhs)] + [a]
+        rhs_indices = [b] + self._indices[len(lhs):]
+        lhs_tensor = Tensor(lhs_indices,
+                            u.reshape([idx.size for idx in lhs_indices]))
+        rhs_tensor = Tensor(rhs_indices,
+                            v.reshape([idx.size for idx in rhs_indices]))
+        return lhs_tensor, rhs_tensor
+
+    @property
+    def rank(self):
+        return self._rank
 
     def __add__(self, rhs: Any) -> "Tensor":
         if isinstance(rhs, Number):
@@ -171,3 +296,16 @@ class Tensor:
         indices_str = ", ".join([str(idx) for idx in self._indices])
         data_str = str(self._data)
         return indices_str + "\n" + data_str
+
+
+# def decompose(t: Tensor,
+#               axes=Tuple[List[int], List[int]]) -> Tuple[Tensor, Tensor]:
+#     t.transpose(axes=axes)
+
+# def svdBond(lhs: Tensor, rhs: Tensor) -> Tensor:
+#     lhs_contracted, rhs_contracted = getEinsumRule(lhs._indices, rhs._indices)
+#     lhs_free = [i for i in range(lhs.rank) if i not in lhs_contracted]
+#     rhs_free = [i for i in range(rhs.rank) if i not in rhs_contracted]
+
+#     contracted = lhs * rhs
+#     return
