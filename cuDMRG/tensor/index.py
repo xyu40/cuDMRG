@@ -18,7 +18,7 @@ class Index:
         size: int,
         index_type: IndexType = IndexType.VIRTUAL,
         level: int = 0,
-    ):
+    ) -> None:
         self._id = uuid.uuid4()
         self._size: int = size
         self._index_type: IndexType = index_type
@@ -85,7 +85,8 @@ class Index:
             return False
 
     def __str__(self):
-        return f"Index({self._size}, {self._index_type}, {self._level})"
+        return (f"Index({self._size}, {self._index_type}, "
+                f"{self._level}, {self._id})")
 
 
 def getEinsumRule(lhs: List[Index],

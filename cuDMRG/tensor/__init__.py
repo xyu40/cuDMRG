@@ -1,4 +1,4 @@
-from .index import Index, getEinsumRule
+from .index import Index, IndexType, getEinsumRule
 from .tensor import Tensor
 
-__all__ = ["Index", "Tensor", "getEinsumRule"]
+__all__ = ["Index", "IndexType", "Tensor", "getEinsumRule"]

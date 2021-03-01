@@ -17,7 +17,7 @@ class Tensor:
         self,
         indices: List[Index],
         data: Optional[xp.ndarray] = None,
-    ):
+    ) -> None:
         if data is not None and len(indices) != len(data.shape):
             error_msg = "indices shape does not match data shape"
             logger.error(error_msg)
@@ -116,17 +116,15 @@ class Tensor:
     def deompose(self,
                  lhs: List[int],
                  rhs: List[int],
-                 connection: Optional[Index] = None,
                  mergeV: bool = True,
-                 cutoff: float = 1e-9,
-                 maxdim: int = 4096) -> Tuple["Tensor", "Tensor", int]:
+                 cutoff: float = 0.0,
+                 maxdim: int = 2147483648) -> Tuple["Tensor", "Tensor", int]:
         lhs_size = reduce(lambda x, y: x * y,
                           [self._indices[i].size for i in lhs])
         rhs_size = reduce(lambda x, y: x * y,
                           [self._indices[i].size for i in rhs])
         self.transpose(lhs + rhs)
-        self._data.reshape([lhs_size, rhs_size])
-        u, s, v = xp.linalg.svd(self._data,
+        u, s, v = xp.linalg.svd(self._data.reshape([lhs_size, rhs_size]),
                                 full_matrices=False,
                                 compute_uv=True)
 
@@ -149,10 +147,7 @@ class Tensor:
         else:
             u = u @ xp.diag(s)
 
-        if connection is None:
-            a = Index(dim)
-        else:
-            a = deepcopy(connection).setSize(dim).resetLevel()
+        a = Index(dim)
 
         lhs_indices = self._indices[:len(lhs)] + [a]
         rhs_indices = [a] + self._indices[len(lhs):]
@@ -163,8 +158,12 @@ class Tensor:
         return lhs_tensor, rhs_tensor, dim
 
     @property
-    def rank(self):
+    def rank(self) -> int:
         return self._rank
+
+    @property
+    def indices(self) -> List[Index]:
+        return self._indices
 
     def __add__(self, rhs: Any) -> "Tensor":
         if isinstance(rhs, Number):
@@ -293,6 +292,7 @@ class Tensor:
             raise RuntimeError(msg)
 
     def __str__(self) -> str:
-        indices_str = ", ".join([str(idx) for idx in self._indices])
+        rank_str = f"rank = {self._rank}"
+        indices_str = "\n".join([str(idx) for idx in self._indices])
         data_str = str(self._data)
-        return indices_str + "\n" + data_str
+        return "\n".join([rank_str, indices_str, data_str])
