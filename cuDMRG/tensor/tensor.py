@@ -1,7 +1,10 @@
 try:
     import cupy as xp
+    from cupy import cutensor
+    USE_CUPY = True
 except ImportError:
     import numpy as xp
+    USE_CUPY = False
 from numbers import Number
 from copy import deepcopy
 from functools import reduce
@@ -13,11 +16,10 @@ logger = get_logger(__name__)
 
 
 class Tensor:
-    def __init__(
-        self,
-        indices: List[Index],
-        data: Optional[xp.ndarray] = None,
-    ) -> None:
+    def __init__(self,
+                 indices: List[Index],
+                 data: Optional[xp.ndarray] = None,
+                 use_cutensor: bool = True) -> None:
         if data is not None and len(indices) != len(data.shape):
             error_msg = "indices shape does not match data shape"
             logger.error(error_msg)
@@ -28,7 +30,8 @@ class Tensor:
         if data is None:
             self.setZero()
         else:
-            self._data = deepcopy(data)
+            self._data = data
+        self.use_cutensor = USE_CUPY and use_cutensor
 
     def norm(self) -> float:
         return xp.linalg.norm(self._data)
@@ -58,7 +61,7 @@ class Tensor:
     def lowerIndexLevel(self,
                         indexType: IndexType = IndexType.ANYTYPE) -> "Tensor":
         for idx in self._indices:
-            idx.raiseLevel(indexType)
+            idx.lowerLevel(indexType)
         return self
 
     def resetIndexLevel(self,
@@ -179,7 +182,7 @@ class Tensor:
             res_indices = deepcopy(self._indices)
             return Tensor(res_indices, res_data)
         else:
-            msg = f"Unsupported multiplication with {type(rhs)}"
+            msg = f"Unsupported __add__ with rhs of type {type(rhs)}"
             logger.error(msg)
             raise RuntimeError(msg)
 
@@ -189,7 +192,7 @@ class Tensor:
         elif isinstance(rhs, Tensor):
             self._data = self._data + rhs._data
         else:
-            msg = f"Unsupported multiplication with {type(rhs)}"
+            msg = f"Unsupported __iadd__ with rhs of type {type(rhs)}"
             logger.error(msg)
             raise RuntimeError(msg)
         return self
@@ -204,7 +207,7 @@ class Tensor:
             res_indices = deepcopy(self._indices)
             return Tensor(res_indices, res_data)
         else:
-            msg = f"Unsupported multiplication with {type(rhs)}"
+            msg = f"Unsupported __sub__ with rhs of type {type(rhs)}"
             logger.error(msg)
             raise RuntimeError(msg)
 
@@ -214,7 +217,7 @@ class Tensor:
         elif isinstance(rhs, Tensor):
             self._data = self._data - rhs._data
         else:
-            msg = f"Unsupported multiplication with {type(rhs)}"
+            msg = f"Unsupported __isub__ with rhs of type {type(rhs)}"
             logger.error(msg)
             raise RuntimeError(msg)
         return self
@@ -231,29 +234,35 @@ class Tensor:
             ] + [
                 idx for j, idx in enumerate(rhs._indices) if j not in axes[1]
             ])
-            res_data = xp.tensordot(self._data, rhs._data, axes=axes)
-            return Tensor(res_indices, res_data)
+            if not self.use_cutensor:
+                res_data = xp.tensordot(self._data, rhs._data, axes=axes)
+                return Tensor(res_indices, res_data)
+            else:
+                a = xp.ascontiguousarray(self._data)
+                b = xp.ascontiguousarray(rhs._data)
+                c = xp.zeros([idx.size for idx in res_indices])
+                desc_a = cutensor.create_tensor_descriptor(a)
+                desc_b = cutensor.create_tensor_descriptor(b)
+                desc_c = cutensor.create_tensor_descriptor(c)
+                mode_a = [chr(97 + i) for i in range(self._rank)]
+                mode_b = [
+                    chr(97 + i)
+                    for i in range(self._rank, self._rank + rhs._rank)
+                ]
+                for i, j in zip(axes[0], axes[1]):
+                    mode_b[j] = mode_a[i]
+                mode_c = (
+                    [mode_a[i]
+                     for i in range(self._rank) if i not in axes[0]] +
+                    [mode_b[j] for j in range(rhs._rank) if j not in axes[1]])
+                mode_a = cutensor.create_mode(*mode_a)
+                mode_b = cutensor.create_mode(*mode_b)
+                mode_c = cutensor.create_mode(*mode_c)
+                cutensor.contraction(1.0, a, desc_a, mode_a, b, desc_b, mode_b,
+                                     0.0, c, desc_c, mode_c)
+                return Tensor(res_indices, c)
         else:
-            msg = f"Unsupported multiplication with {type(rhs)}"
-            logger.error(msg)
-            raise RuntimeError(msg)
-
-    def __rmul__(self, lhs: Any) -> "Tensor":
-        if isinstance(lhs, Number):
-            res_tensor = deepcopy(self)
-            res_tensor._data *= lhs
-            return res_tensor
-        elif isinstance(lhs, Tensor):
-            axes = getEinsumRule(lhs._indices, self._indices)
-            res_indices = ([
-                idx for j, idx in enumerate(lhs._indices) if j not in axes[1]
-            ] + [
-                idx for i, idx in enumerate(self._indices) if i not in axes[0]
-            ])
-            res_data = xp.tensordot(lhs._data, self._data, axes=axes)
-            return Tensor(res_indices, res_data)
-        else:
-            msg = f"Unsupported multiplication with {type(lhs)}"
+            msg = f"Unsupported __mul__ with rhs of type {type(rhs)}"
             logger.error(msg)
             raise RuntimeError(msg)
 
@@ -262,19 +271,54 @@ class Tensor:
             self._data *= rhs
         elif isinstance(rhs, Tensor):
             axes = getEinsumRule(self._indices, rhs._indices)
-            res_indices = ([
+            res_indices = deepcopy([
                 idx for i, idx in enumerate(self._indices) if i not in axes[0]
             ] + [
                 idx for j, idx in enumerate(rhs._indices) if j not in axes[1]
             ])
-            res_data = xp.tensordot(self._data, rhs._data, axes=axes)
-            self._indices = res_indices
-            self._data = res_data
+            if not self.use_cutensor:
+                self._data = xp.tensordot(self._data, rhs._data, axes=axes)
+            else:
+                a = xp.ascontiguousarray(self._data)
+                b = xp.ascontiguousarray(rhs._data)
+                c = xp.zeros([idx.size for idx in res_indices])
+                desc_a = cutensor.create_tensor_descriptor(a)
+                desc_b = cutensor.create_tensor_descriptor(b)
+                desc_c = cutensor.create_tensor_descriptor(c)
+                mode_a = [chr(97 + i) for i in range(self._rank)]
+                mode_b = [
+                    chr(97 + i)
+                    for i in range(self._rank, self._rank + rhs._rank)
+                ]
+                for i, j in zip(axes[0], axes[1]):
+                    mode_b[j] = mode_a[i]
+                mode_c = (
+                    [mode_a[i]
+                     for i in range(self._rank) if i not in axes[0]] +
+                    [mode_b[j] for j in range(rhs._rank) if j not in axes[1]])
+                mode_a = cutensor.create_mode(*mode_a)
+                mode_b = cutensor.create_mode(*mode_b)
+                mode_c = cutensor.create_mode(*mode_c)
+                cutensor.contraction(1.0, a, desc_a, mode_a, b, desc_b, mode_b,
+                                     0.0, c, desc_c, mode_c)
+                self._data = c
+            self._indices = deepcopy(res_indices)
+            self._rank = len(self._indices)
         else:
-            msg = f"Unsupported multiplication with {type(rhs)}"
+            msg = f"Unsupported __imul__ with rhs of type {type(rhs)}"
             logger.error(msg)
             raise RuntimeError(msg)
         return self
+
+    def __rmul__(self, lhs: Any) -> "Tensor":
+        if isinstance(lhs, Number):
+            res_tensor = deepcopy(self)
+            res_tensor._data *= lhs
+            return res_tensor
+        else:
+            msg = f"Unsupported __rmul__ with lhs of type {type(lhs)}"
+            logger.error(msg)
+            raise RuntimeError(msg)
 
     def __truediv__(self, rhs: Any) -> "Tensor":
         if isinstance(rhs, Number):
@@ -282,7 +326,7 @@ class Tensor:
             res_tensor._data /= rhs
             return res_tensor
         else:
-            msg = f"Unsupported division with {type(rhs)}"
+            msg = f"Unsupported __truediv__ with rhs of type {type(rhs)}"
             logger.error(msg)
             raise RuntimeError(msg)
 
@@ -291,7 +335,7 @@ class Tensor:
             self._data /= rhs
             return self
         else:
-            msg = f"Unsupported division with {type(rhs)}"
+            msg = f"Unsupported __idiv__ with rhs of type {type(rhs)}"
             logger.error(msg)
             raise RuntimeError(msg)
 
