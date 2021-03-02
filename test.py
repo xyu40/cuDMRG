@@ -1,5 +1,4 @@
-from cuDMRG.apps.sites import Sites
-from cuDMRG import Index, Tensor, MPS
+from cuDMRG import Index, Tensor, MPS, Sites, Heisenberg, psiHphi
 
 if __name__ == "__main__":
     a = Index(6)
@@ -13,20 +12,21 @@ if __name__ == "__main__":
 
     A = Tensor([a, b, c]).setRandom()
     B = Tensor([c, d]).setRandom()
-    C = (A * B).normalize()
-    print(C)
+    C = A * B
+    print(C.norm())
+    C.normalize()
+    print(C.norm())
 
-    lhs, rhs, dim = C.deompose(lhs=[0, 1],
-                               rhs=[2],
-                               mergeV=False,
-                               cutoff=1e-9,
-                               maxdim=8)
+    lhs, rhs, s, dim = C.deompose(lhs=[0, 1],
+                                  rhs=[2],
+                                  mergeV=False,
+                                  cutoff=1e-9,
+                                  maxdim=8)
     print(dim)
     print((lhs * rhs - C).norm())
 
     sites = Sites(10, 2)
-    m = MPS(sites, 2).setRandom()
-    m.canonicalize()
-
-    print(m._tensors[0].norm())
-    print(m._tensors[-1].norm())
+    psi = MPS(sites, 1).setRandom().canonicalize()
+    phi = MPS(sites, 1).setRandom().canonicalize()
+    H = Heisenberg(sites, J=1, h=0).build()
+    print(psiHphi(psi, H, phi))

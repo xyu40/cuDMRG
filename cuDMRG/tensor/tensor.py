@@ -42,7 +42,7 @@ class Tensor:
         return self
 
     def setOne(self) -> "Tensor":
-        self._data = xp.ones((idx.size for idx in self._indices))
+        self._data = xp.ones([idx.size for idx in self._indices])
         return self
 
     def setRandom(self) -> "Tensor":
@@ -109,16 +109,20 @@ class Tensor:
 
         res_size = [self._indices[i].size for i in lhs_indices]
         diag_size = reduce(lambda x, y: x * y, res_size)
-        res_indices = [self._indices[i].resetLevel() for i in lhs_indices]
+        res_indices = [
+            deepcopy(self._indices[i]).resetLevel() for i in lhs_indices
+        ]
         res_data = xp.diag(self._data.reshape(diag_size, -1)).reshape(res_size)
         return Tensor(res_indices, res_data)
 
-    def deompose(self,
-                 lhs: List[int],
-                 rhs: List[int],
-                 mergeV: bool = True,
-                 cutoff: float = 0.0,
-                 maxdim: int = 2147483648) -> Tuple["Tensor", "Tensor", int]:
+    def deompose(
+            self,
+            lhs: List[int],
+            rhs: List[int],
+            mergeV: bool = True,
+            cutoff: float = 0.0,
+            maxdim: int = 2147483648
+    ) -> Tuple["Tensor", "Tensor", xp.array, int]:
         lhs_size = reduce(lambda x, y: x * y,
                           [self._indices[i].size for i in lhs])
         rhs_size = reduce(lambda x, y: x * y,
@@ -155,7 +159,7 @@ class Tensor:
                             u.reshape([idx.size for idx in lhs_indices]))
         rhs_tensor = Tensor(rhs_indices,
                             v.reshape([idx.size for idx in rhs_indices]))
-        return lhs_tensor, rhs_tensor, dim
+        return lhs_tensor, rhs_tensor, s, dim
 
     @property
     def rank(self) -> int:
@@ -294,5 +298,5 @@ class Tensor:
     def __str__(self) -> str:
         rank_str = f"rank = {self._rank}"
         indices_str = "\n".join([str(idx) for idx in self._indices])
-        data_str = str(self._data)
+        data_str = str(self._data.shape)
         return "\n".join([rank_str, indices_str, data_str])
