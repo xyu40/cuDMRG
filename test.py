@@ -1,4 +1,3 @@
-import cupy as cp
 from cuDMRG import Index, Tensor, MPS, Sites, Heisenberg, psiHphi
 from cuDMRG import LinearMult, lanczos
 import numpy as np
