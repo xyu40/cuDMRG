@@ -78,7 +78,7 @@ class Tensor:
             idx.mapLevel(level_from, level_to, indexType)
         return self
 
-    def transpose(self, axes) -> "Tensor":
+    def transpose(self, axes, inplace=True) -> "Tensor":
         if len(set(axes)) != len(axes):
             msg = "Invalid transpose input"
             logger.error(msg)
@@ -90,10 +90,17 @@ class Tensor:
                 transpose_needed = True
                 break
 
-        if transpose_needed:
-            self._indices = [self._indices[i] for i in axes]
-            self._data = xp.transpose(self._data, axes=axes)
-        return self
+        if inplace:
+            if transpose_needed:
+                self._indices = [self._indices[i] for i in axes]
+                self._data = xp.transpose(self._data, axes=axes)
+            return self
+        else:
+            res = deepcopy(self)
+            if transpose_needed:
+                res._indices = [res._indices[i] for i in axes]
+                res._data = xp.transpose(res._data, axes=axes)
+            return res
 
     def diagonal(self) -> "Tensor":
         if self._rank % 2 != 0:
@@ -118,7 +125,7 @@ class Tensor:
         res_data = xp.diag(self._data.reshape(diag_size, -1)).reshape(res_size)
         return Tensor(res_indices, res_data)
 
-    def deompose(
+    def decompose(
             self,
             lhs: List[int],
             rhs: List[int],
@@ -169,11 +176,15 @@ class Tensor:
         return self._rank
 
     @property
+    def size(self) -> int:
+        return self._data.size
+
+    @property
     def indices(self) -> List[Index]:
         return self._indices
 
     def __add__(self, rhs: Any) -> "Tensor":
-        if isinstance(rhs, Number):
+        if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
             res_tensor = deepcopy(self)
             res_tensor._data += rhs
             return res_tensor
@@ -187,7 +198,7 @@ class Tensor:
             raise RuntimeError(msg)
 
     def __iadd__(self, rhs: Any) -> "Tensor":
-        if isinstance(rhs, Number):
+        if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
             self._data += rhs
         elif isinstance(rhs, Tensor):
             self._data = self._data + rhs._data
@@ -198,7 +209,7 @@ class Tensor:
         return self
 
     def __sub__(self, rhs: Any) -> "Tensor":
-        if isinstance(rhs, Number):
+        if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
             res_tensor = deepcopy(self)
             res_tensor._data -= rhs
             return res_tensor
@@ -212,7 +223,7 @@ class Tensor:
             raise RuntimeError(msg)
 
     def __isub__(self, rhs: Any) -> "Tensor":
-        if isinstance(rhs, Number):
+        if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
             self._data -= rhs
         elif isinstance(rhs, Tensor):
             self._data = self._data - rhs._data
@@ -223,7 +234,7 @@ class Tensor:
         return self
 
     def __mul__(self, rhs: Any) -> "Tensor":
-        if isinstance(rhs, Number):
+        if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
             res_tensor = deepcopy(self)
             res_tensor._data *= rhs
             return res_tensor
@@ -267,7 +278,7 @@ class Tensor:
             raise RuntimeError(msg)
 
     def __imul__(self, rhs: Any) -> "Tensor":
-        if isinstance(rhs, Number):
+        if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
             self._data *= rhs
         elif isinstance(rhs, Tensor):
             axes = getEinsumRule(self._indices, rhs._indices)
@@ -311,7 +322,7 @@ class Tensor:
         return self
 
     def __rmul__(self, lhs: Any) -> "Tensor":
-        if isinstance(lhs, Number):
+        if isinstance(lhs, Number) or isinstance(lhs, xp.ndarray):
             res_tensor = deepcopy(self)
             res_tensor._data *= lhs
             return res_tensor
@@ -321,7 +332,7 @@ class Tensor:
             raise RuntimeError(msg)
 
     def __truediv__(self, rhs: Any) -> "Tensor":
-        if isinstance(rhs, Number):
+        if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
             res_tensor = deepcopy(self)
             res_tensor._data /= rhs
             return res_tensor
@@ -331,7 +342,7 @@ class Tensor:
             raise RuntimeError(msg)
 
     def __idiv__(self, rhs: Any) -> "Tensor":
-        if isinstance(rhs, Number):
+        if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
             self._data /= rhs
             return self
         else:
@@ -342,5 +353,5 @@ class Tensor:
     def __str__(self) -> str:
         rank_str = f"rank = {self._rank}"
         indices_str = "\n".join([str(idx) for idx in self._indices])
-        data_str = str(self._data.shape)
+        data_str = str(self._data)
         return "\n".join([rank_str, indices_str, data_str])
