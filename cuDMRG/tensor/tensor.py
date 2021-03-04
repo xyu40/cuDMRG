@@ -154,7 +154,8 @@ class Tensor:
 
         u = u[:, :dim]
         s = xp.clip(s[:dim] * xp.sqrt(s_norm / s_squared_cumsum[dim - 1]),
-                    a_min=1e-32)
+                    a_min=1e-32,
+                    a_max=None)
         v = v[:dim, :]
 
         if mergeV:
