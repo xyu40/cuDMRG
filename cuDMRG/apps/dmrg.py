@@ -81,9 +81,9 @@ class DMRG:
             self._rEnvs[i] *= self._psi.tensors[i + 1].lowerIndexLevel()
 
     def _update(self, i: int, move_right: bool = True) -> float:
-        op = LinearMult(lhs=[self._lEnvs[i - 1], self._H.tensors[i - 1]],
-                        rhs=[self._H.tensors[i], self._rEnvs[i]])
         x = self._psi.tensors[i - 1] * self._psi.tensors[i]
+        op = LinearMult(self._lEnvs[i - 1] * self._H.tensors[i - 1],
+                        self._H.tensors[i] * self._rEnvs[i], x)
 
         ev, x = lanczos(op, x, self._config["lanczos_search_size"],
                         self._config["lanczos_num_restart"],

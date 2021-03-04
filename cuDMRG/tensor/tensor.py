@@ -6,7 +6,7 @@ except ImportError:
     import numpy as xp
     USE_CUPY = False
 from numbers import Number
-from copy import deepcopy
+from copy import copy
 from functools import reduce
 from typing import List, Tuple, Optional, Any
 from .index import Index, IndexType, getEinsumRule
@@ -26,12 +26,26 @@ class Tensor:
             raise RuntimeError(error_msg)
 
         self._rank = len(indices)
-        self._indices = deepcopy(indices)
+        self._indices = [copy(idx) for idx in indices]
         if data is None:
             self.setZero()
         else:
             self._data = data
         self.use_cutensor = USE_CUPY and use_cutensor
+
+    def copy(self) -> "Tensor":
+        res = Tensor([])
+        res._rank = self.rank
+        res._indices = [copy(idx) for idx in self._indices]
+        res._data = self._data
+        return res
+
+    def deepcopy(self) -> "Tensor":
+        res = Tensor([])
+        res._rank = self.rank
+        res._indices = [copy(idx) for idx in self._indices]
+        res._data = self._data.copy()
+        return res
 
     def norm(self) -> float:
         return xp.linalg.norm(self._data)
@@ -96,7 +110,7 @@ class Tensor:
                 self._data = xp.transpose(self._data, axes=axes)
             return self
         else:
-            res = deepcopy(self)
+            res = self.copy()
             if transpose_needed:
                 res._indices = [res._indices[i] for i in axes]
                 res._data = xp.transpose(res._data, axes=axes)
@@ -120,7 +134,7 @@ class Tensor:
         res_size = [self._indices[i].size for i in lhs_indices]
         diag_size = reduce(lambda x, y: x * y, res_size)
         res_indices = [
-            deepcopy(self._indices[i]).resetLevel() for i in lhs_indices
+            copy(self._indices[i]).resetLevel() for i in lhs_indices
         ]
         res_data = xp.diag(self._data.reshape(diag_size, -1)).reshape(res_size)
         return Tensor(res_indices, res_data)
@@ -186,13 +200,13 @@ class Tensor:
 
     def __add__(self, rhs: Any) -> "Tensor":
         if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
-            res_tensor = deepcopy(self)
+            res_tensor = self.deepcopy()
             res_tensor._data += rhs
             return res_tensor
         elif isinstance(rhs, Tensor):
-            res_data = self._data + rhs._data
-            res_indices = deepcopy(self._indices)
-            return Tensor(res_indices, res_data)
+            res = self.deepcopy()
+            res._data += rhs._data
+            return res
         else:
             msg = f"Unsupported __add__ with rhs of type {type(rhs)}"
             logger.error(msg)
@@ -211,13 +225,13 @@ class Tensor:
 
     def __sub__(self, rhs: Any) -> "Tensor":
         if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
-            res_tensor = deepcopy(self)
+            res_tensor = self.deepcopy()
             res_tensor._data -= rhs
             return res_tensor
         elif isinstance(rhs, Tensor):
-            res_data = self._data - rhs._data
-            res_indices = deepcopy(self._indices)
-            return Tensor(res_indices, res_data)
+            res = self.deepcopy()
+            res._data -= rhs._data
+            return res
         else:
             msg = f"Unsupported __sub__ with rhs of type {type(rhs)}"
             logger.error(msg)
@@ -236,7 +250,7 @@ class Tensor:
 
     def __mul__(self, rhs: Any) -> "Tensor":
         if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
-            res_tensor = deepcopy(self)
+            res_tensor = self.deepcopy()
             res_tensor._data *= rhs
             return res_tensor
         elif isinstance(rhs, Tensor):
@@ -324,7 +338,7 @@ class Tensor:
 
     def __rmul__(self, lhs: Any) -> "Tensor":
         if isinstance(lhs, Number) or isinstance(lhs, xp.ndarray):
-            res_tensor = deepcopy(self)
+            res_tensor = self.deepcopy()
             res_tensor._data *= lhs
             return res_tensor
         else:
@@ -334,7 +348,7 @@ class Tensor:
 
     def __truediv__(self, rhs: Any) -> "Tensor":
         if isinstance(rhs, Number) or isinstance(rhs, xp.ndarray):
-            res_tensor = deepcopy(self)
+            res_tensor = self.deepcopy()
             res_tensor._data /= rhs
             return res_tensor
         else:

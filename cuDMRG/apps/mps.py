@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import copy
 from typing import List
 from .sites import Sites
 from ..tensor import Tensor
@@ -39,11 +39,11 @@ class MPS:
 
     @property
     def leftIndex(self):
-        return deepcopy(self._tensors[0].indices[0])
+        return copy(self._tensors[0].indices[0])
 
     @property
     def rightIndex(self):
-        return deepcopy(self._tensors[-1].indices[-1])
+        return copy(self._tensors[-1].indices[-1])
 
     @property
     def tensors(self) -> List[Tensor]:

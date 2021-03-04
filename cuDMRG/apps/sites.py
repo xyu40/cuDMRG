@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import copy
 from typing import List
 from ..tensor import Index, IndexType
 from ..utils import get_logger
@@ -30,4 +30,4 @@ class Sites:
 
     @property
     def physicalIndices(self) -> List[Index]:
-        return deepcopy(self._physicalIndices)
+        return [copy(idx) for idx in self._physicalIndices]

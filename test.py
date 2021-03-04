@@ -1,6 +1,4 @@
-from cuDMRG import (Index, Tensor, MPS, Sites, Heisenberg, psiHphi, LinearMult,
-                    lanczos, DMRG)
-import numpy as np
+from cuDMRG import Index, Tensor, MPS, Sites, Heisenberg, psiHphi, DMRG
 
 
 def test_basic_tensor():
@@ -39,27 +37,6 @@ def test_basic_mps_mpo():
         print("Basic mps mpo test passed")
 
 
-def test_solver():
-    a = Index(100)
-    b = Index(100)
-    A = Tensor([a, b]).setRandom()
-    B = A.transpose([1, 0], inplace=False)
-    B.indices[-1].raiseLevel()
-
-    M = A * B
-
-    op = LinearMult([A, B], [])
-    x = Tensor([a]).setRandom().raiseIndexLevel()
-    ev, x = lanczos(op, x, 4, 10, smallest=False)
-
-    w, _ = np.linalg.eigh(M._data)
-
-    if not -1e-3 <= (ev - w[-1]) <= 1e-3:
-        print("Basic solver test failed")
-    else:
-        print("Basic solver test passed")
-
-
 def test_basic_dmrg():
     sites = Sites(100, 2)
     H = Heisenberg(sites, J=1, h=0).build()
@@ -70,5 +47,4 @@ def test_basic_dmrg():
 if __name__ == "__main__":
     test_basic_tensor()
     test_basic_mps_mpo()
-    test_solver()
     test_basic_dmrg()

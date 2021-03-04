@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy
+from copy import copy
 from typing import List
 from .sites import Sites
 from .mps import MPS
@@ -16,7 +16,7 @@ class MPO(ABC):
 
         physicalIndices = sites.physicalIndices
         physicalIndicesPrime = [
-            deepcopy(idx).raiseLevel() for idx in physicalIndices
+            copy(idx).raiseLevel() for idx in physicalIndices
         ]
         virtualIndices = sites.virtualIndices
         for i, vidx in enumerate(virtualIndices):
@@ -48,11 +48,11 @@ class MPO(ABC):
 
     @property
     def leftIndex(self):
-        return deepcopy(self._tensors[0].indices[0])
+        return copy(self._tensors[0].indices[0])
 
     @property
     def rightIndex(self):
-        return deepcopy(self._tensors[-1].indices[-1])
+        return copy(self._tensors[-1].indices[-1])
 
     @abstractmethod
     def build(self) -> "MPO":
@@ -72,7 +72,7 @@ def psiHphi(psi: MPS, H: MPO, phi: MPS) -> float:
 
     if psi is phi:
         for i in range(H.length):
-            res *= deepcopy(psi.tensors[i]).raiseIndexLevel()
+            res *= psi.tensors[i].copy().raiseIndexLevel()
             res *= H.tensors[i]
             res *= phi.tensors[i]
 
