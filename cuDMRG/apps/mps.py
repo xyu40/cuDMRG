@@ -65,12 +65,13 @@ class MPS:
         return self
 
     def canonicalize(self) -> "MPS":
-        for i in range(self._length - 1, -1, -1):
+        for i in range(self._length - 1, 0, -1):
             lhs, rhs, _, _ = self._tensors[i].decompose(lhs=[0],
                                                         rhs=[1, 2],
                                                         mergeV=False)
             self._tensors[i] = rhs
-            if i > 0:
-                self._tensors[i - 1] *= lhs
+            self._tensors[i - 1] *= lhs
+
+        self._tensors[0].normalize()
         self._center = 0
         return self

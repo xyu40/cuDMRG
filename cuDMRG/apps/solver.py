@@ -5,7 +5,7 @@ except ImportError:
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from functools import reduce
-from typing import List
+from typing import List, Tuple
 from ..tensor import Tensor
 from ..utils import get_logger
 
@@ -22,7 +22,7 @@ class LinearOp(ABC):
 
 
 class LinearMult(LinearOp):
-    def __init__(self, lhs: List[Tensor], rhs: List[Tensor]):
+    def __init__(self, lhs: List[Tensor], rhs: List[Tensor]) -> None:
         super().__init__()
 
         self._lhs = lhs
@@ -39,11 +39,11 @@ class LinearMult(LinearOp):
             return res
 
 
-def lanczos(op: LinearMult,
+def lanczos(op: LinearOp,
             x: Tensor,
             krylov_size: int,
             num_restarts: int,
-            smallest: bool = True):
+            smallest: bool = True) -> Tuple[float, Tensor]:
     v_next = deepcopy(x)
     beta = xp.zeros(krylov_size + 1)
     alpha = xp.zeros(krylov_size)
@@ -54,12 +54,13 @@ def lanczos(op: LinearMult,
         V = xp.zeros([x.size, krylov_size])
         for i in range(0, krylov_size):
             w = op(v_next)
-            alpha[i] = xp.dot(w._data, v_next._data)
+            alpha[i] = xp.dot(w._data.reshape(x.size),
+                              v_next._data.reshape(x.size))
             w -= (v_next * alpha[i] + v_prev * beta[i])
             beta[i + 1] = w.norm()
             v_prev = deepcopy(v_next)
             v_next = w / beta[i + 1]
-            V[:, i] = v_prev._data
+            V[:, i] = v_prev._data.reshape(x.size)
 
         tridiag = xp.diag(alpha)
         for i in range(0, krylov_size - 1):
@@ -69,9 +70,9 @@ def lanczos(op: LinearMult,
 
         if smallest:
             ev = d[0]
-            v_next._data = V @ v[:, 0]
+            v_next._data = (V @ v[:, 0]).reshape(x._data.shape)
         else:
             ev = d[-1]
-            v_next._data = V @ v[:, -1]
+            v_next._data = (V @ v[:, -1]).reshape(x._data.shape)
 
-    return ev, v_next
+    return ev, v_next.normalize()

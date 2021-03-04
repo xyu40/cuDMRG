@@ -1,5 +1,5 @@
-from cuDMRG import Index, Tensor, MPS, Sites, Heisenberg, psiHphi
-from cuDMRG import LinearMult, lanczos
+from cuDMRG import (Index, Tensor, MPS, Sites, Heisenberg, psiHphi, LinearMult,
+                    lanczos, DMRG)
 import numpy as np
 
 
@@ -60,7 +60,15 @@ def test_solver():
         print("Basic solver test passed")
 
 
+def test_basic_dmrg():
+    sites = Sites(100, 2)
+    H = Heisenberg(sites, J=1, h=0).build()
+    model = DMRG(sites, H)
+    model.run()
+
+
 if __name__ == "__main__":
     test_basic_tensor()
     test_basic_mps_mpo()
     test_solver()
+    test_basic_dmrg()

@@ -19,7 +19,7 @@ class Tensor:
     def __init__(self,
                  indices: List[Index],
                  data: Optional[xp.ndarray] = None,
-                 use_cutensor: bool = True) -> None:
+                 use_cutensor: bool = False) -> None:
         if data is not None and len(indices) != len(data.shape):
             error_msg = "indices shape does not match data shape"
             logger.error(error_msg)
@@ -153,7 +153,8 @@ class Tensor:
                 break
 
         u = u[:, :dim]
-        s = s[:dim] * xp.sqrt(s_norm / s_squared_cumsum[dim - 1])
+        s = xp.clip(s[:dim] * xp.sqrt(s_norm / s_squared_cumsum[dim - 1]),
+                    a_min=1e-32)
         v = v[:dim, :]
 
         if mergeV:
@@ -162,7 +163,6 @@ class Tensor:
             u = u @ xp.diag(s)
 
         a = Index(dim)
-
         lhs_indices = self._indices[:len(lhs)] + [a]
         rhs_indices = [a] + self._indices[len(lhs):]
         lhs_tensor = Tensor(lhs_indices,
@@ -353,5 +353,5 @@ class Tensor:
     def __str__(self) -> str:
         rank_str = f"rank = {self._rank}"
         indices_str = "\n".join([str(idx) for idx in self._indices])
-        data_str = str(self._data)
+        data_str = str(self._data.shape)
         return "\n".join([rank_str, indices_str, data_str])
