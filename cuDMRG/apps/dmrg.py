@@ -3,7 +3,6 @@ try:
 except ImportError:
     import numpy as xp
 from copy import deepcopy
-from functools import reduce
 from typing import Dict, Any, Optional
 from .sites import Sites
 from .mps import MPS
@@ -15,9 +14,9 @@ from ..utils import get_logger
 logger = get_logger(__name__)
 
 CONFIG: Dict[str, Any] = {
-    "num_sweeps": 5,
-    "svd_error": 1e-6,
-    "max_bond_dimension": 100,
+    "num_sweeps": 10,
+    "svd_error": 1e-10,
+    "max_bond_dimension": 200,
     "lanczos_search_size": 3,
     "lanczos_num_restart": 1,
     "lanczos_smallest": True,

@@ -283,7 +283,7 @@ class Tensor:
             self._data *= rhs
         elif isinstance(rhs, Tensor):
             axes = getEinsumRule(self._indices, rhs._indices)
-            res_indices = deepcopy([
+            res_indices = ([
                 idx for i, idx in enumerate(self._indices) if i not in axes[0]
             ] + [
                 idx for j, idx in enumerate(rhs._indices) if j not in axes[1]
@@ -314,7 +314,7 @@ class Tensor:
                 cutensor.contraction(1.0, a, desc_a, mode_a, b, desc_b, mode_b,
                                      0.0, c, desc_c, mode_c)
                 self._data = c
-            self._indices = deepcopy(res_indices)
+            self._indices = res_indices
             self._rank = len(self._indices)
         else:
             msg = f"Unsupported __imul__ with rhs of type {type(rhs)}"
