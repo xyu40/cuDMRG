@@ -5,6 +5,7 @@ try:
 except ImportError:
     import numpy as xp
     USE_CUPY = False
+import numpy as np
 from numbers import Number
 from copy import copy
 from functools import reduce
@@ -144,7 +145,7 @@ class Tensor:
             lhs: List[int],
             rhs: List[int],
             mergeV: bool = True,
-            cutoff: float = 0.0,
+            cutoff: float = 1e-12,
             maxdim: int = 2147483648
     ) -> Tuple["Tensor", "Tensor", xp.array, int]:
         lhs_size = reduce(lambda x, y: x * y,
@@ -160,14 +161,16 @@ class Tensor:
         s_cutoff = (1 - cutoff) * s_norm * s_norm
         s_squared_cumsum = xp.cumsum(xp.power(s, 2))
 
-        dim = 0
-        for i in range(s.size):
-            dim += 1
-            if s_squared_cumsum[i] >= s_cutoff or (dim + 1) > maxdim:
-                break
+        # dim = 0
+        # for i in range(s.size):
+        #     dim += 1
+        #     if s_squared_cumsum[i] >= s_cutoff or (dim + 1) > maxdim:
+        #         break
+        dim = int(xp.searchsorted(s_squared_cumsum[:maxdim], s_cutoff)) + 1
+        dim = min(dim, s.size, maxdim)
 
         u = u[:, :dim]
-        s = xp.clip(s[:dim] * xp.sqrt(s_norm / s_squared_cumsum[dim - 1]),
+        s = xp.clip(s[:dim] * s_norm / xp.sqrt(s_squared_cumsum[dim - 1]),
                     a_min=1e-32,
                     a_max=None)
         v = v[:dim, :]

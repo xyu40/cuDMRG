@@ -3,7 +3,7 @@ try:
 except ImportError:
     import numpy as xp
 from copy import deepcopy
-from typing import Dict, Any, Optional
+from typing import Dict, Tuple, Any, Optional
 from .sites import Sites
 from .mps import MPS
 from .mpo import MPO
@@ -15,8 +15,8 @@ logger = get_logger(__name__)
 
 CONFIG: Dict[str, Any] = {
     "num_sweeps": 10,
-    "svd_error": 1e-10,
-    "max_bond_dimension": 200,
+    "svd_error": 1e-16,
+    "max_bond_dimension": 500,
     "lanczos_search_size": 3,
     "lanczos_num_restart": 1,
     "lanczos_smallest": True,
@@ -54,12 +54,15 @@ class DMRG:
 
     def run(self) -> None:
         L = self._sites.length
+        max_dim = 0
         for sweep in range(self._config["num_sweeps"]):
             for i in range(1, L):
-                ev = self._update(i, move_right=True)
+                ev, dim = self._update(i, move_right=True)
+                max_dim = max(dim, max_dim)
             for i in range(L - 1, 0, -1):
-                ev = self._update(i, move_right=False)
-            logger.info(f"sweep = {sweep}, E = {ev}")
+                ev, dim = self._update(i, move_right=False)
+                max_dim = max(dim, max_dim)
+            logger.info(f"sweep = {sweep}, E = {ev}, max_dim = {max_dim}")
 
     def _buildEnv(self):
         L = self._sites.length
@@ -80,7 +83,7 @@ class DMRG:
             self._rEnvs[i] *= self._H.tensors[i + 1]
             self._rEnvs[i] *= self._psi.tensors[i + 1].lowerIndexLevel()
 
-    def _update(self, i: int, move_right: bool = True) -> float:
+    def _update(self, i: int, move_right: bool = True) -> Tuple[float, int]:
         x = self._psi.tensors[i - 1] * self._psi.tensors[i]
         op = LinearMult(self._lEnvs[i - 1] * self._H.tensors[i - 1],
                         self._H.tensors[i] * self._rEnvs[i], x)
@@ -109,4 +112,4 @@ class DMRG:
             self._rEnvs[i - 1] *= self._H.tensors[i]
             self._rEnvs[i - 1] *= self._psi.tensors[i].lowerIndexLevel()
 
-        return ev
+        return ev, dim
