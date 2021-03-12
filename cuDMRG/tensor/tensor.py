@@ -5,7 +5,6 @@ try:
 except ImportError:
     import numpy as xp
     USE_CUPY = False
-import numpy as np
 from numbers import Number
 from copy import copy
 from functools import reduce
