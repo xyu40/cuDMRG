@@ -38,7 +38,7 @@ def test_basic_mps_mpo():
 
 
 def test_basic_dmrg():
-    sites = Sites(200, 2)
+    sites = Sites(100, 2)
     H = Heisenberg(sites, J=1, h=0).build()
     model = DMRG(sites, H)
     model.run()

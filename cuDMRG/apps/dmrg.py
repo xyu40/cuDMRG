@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 CONFIG: Dict[str, Any] = {
     "num_sweeps": 10,
     "svd_error": 1e-16,
-    "max_bond_dimension": 500,
+    "max_bond_dimension": 1000,
     "lanczos_search_size": 3,
     "lanczos_num_restart": 1,
     "lanczos_smallest": True,
